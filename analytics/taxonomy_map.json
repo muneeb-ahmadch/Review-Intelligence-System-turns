@@ -2,5 +2,11 @@
   "account_balance": "Account & Balance",
   "card_management": "Card Management",
   "money_transfers": "Payments & Transfers",
-  "login": "Login & Authentication"
+  "login": "Login & Authentication",
+  "authentication": "Login & Authentication",
+  "security": "Login & Authentication",
+  "performance": "App Performance",
+  "crash": "App Performance",
+  "notifications": "Notifications",
+  "__fallback__": "Other"
 }
