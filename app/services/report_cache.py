@@ -1,0 +1,1 @@
+"""Report cache placeholder module."""

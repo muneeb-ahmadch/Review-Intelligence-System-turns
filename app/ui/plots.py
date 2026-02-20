@@ -1,0 +1,1 @@
+"""UI plots placeholder module."""

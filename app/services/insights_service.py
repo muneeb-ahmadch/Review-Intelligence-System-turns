@@ -1,0 +1,1 @@
+"""Insights service placeholder module."""

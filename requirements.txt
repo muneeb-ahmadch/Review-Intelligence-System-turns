@@ -1,0 +1,8 @@
+pandas
+duckdb
+pydantic
+jsonschema
+gradio
+matplotlib
+requests
+python-dotenv

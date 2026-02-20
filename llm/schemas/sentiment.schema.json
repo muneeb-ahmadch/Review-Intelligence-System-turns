@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sentiment Output",
+  "type": "object",
+  "properties": {
+    "sentiment_label": {"type": "string"},
+    "confidence": {"type": "number"}
+  },
+  "required": ["sentiment_label", "confidence"]
+}

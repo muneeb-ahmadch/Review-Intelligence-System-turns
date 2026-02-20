@@ -1,0 +1,1 @@
+"""KPI definitions placeholder module."""

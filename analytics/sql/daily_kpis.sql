@@ -1,0 +1,1 @@
+-- Placeholder SQL for daily KPI materialization.
