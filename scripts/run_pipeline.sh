@@ -10,4 +10,8 @@ fi
 "$PYTHON_BIN" pipeline/00_ingest.py
 "$PYTHON_BIN" pipeline/01_normalize.py
 "$PYTHON_BIN" pipeline/02_enrich_sentiment.py
+"$PYTHON_BIN" pipeline/03_enrich_issues.py
 "$PYTHON_BIN" pipeline/04_score_severity.py
+"$PYTHON_BIN" pipeline/05_user_churn.py
+"$PYTHON_BIN" pipeline/06_aggregates_daily.py
+"$PYTHON_BIN" pipeline/07_aggregates_version.py
