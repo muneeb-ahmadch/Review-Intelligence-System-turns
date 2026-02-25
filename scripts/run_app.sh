@@ -2,4 +2,10 @@
 set -euo pipefail
 
 : "${GRADIO_SERVER_PORT:=7861}"
-python3 -m app.gradio_app
+
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+if [[ -x ".venv/bin/python" ]]; then
+  PYTHON_BIN=".venv/bin/python"
+fi
+
+"$PYTHON_BIN" -m app.gradio_app

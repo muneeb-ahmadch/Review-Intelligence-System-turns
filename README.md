@@ -35,4 +35,11 @@ Current pipeline scripts are scaffolds for steps `00` to `09` and will be implem
 bash scripts/run_app.sh
 ```
 
-The app currently shows a minimal status screen while DB-backed views are being implemented.
+The Gradio app now uses a dashboard-style UI with:
+
+- Sidebar navigation for Overview, Trends, Issues, Release Diff, Executive Brief, and Sprint Planner
+- Calendar date pickers with quick presets (`7D`, `30D`, `90D`, `YTD`)
+- Upgraded matplotlib chart styling for dashboard readability
+- Sprint backlog ticket board rendering plus raw JSON toggle and CSV export
+
+No backend run-command changes were introduced. Keep using `bash scripts/run_app.sh`.
