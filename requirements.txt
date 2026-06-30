@@ -1,8 +1,10 @@
 pandas
 duckdb
-pydantic
 jsonschema
 gradio
 matplotlib
 requests
 python-dotenv
+# Optional: only needed if you set ANTHROPIC_API_KEY to generate insights live
+# with Claude. The pipeline, dashboard, and cached insights run without it.
+anthropic

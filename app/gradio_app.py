@@ -66,16 +66,26 @@ def _get_kpis(start_date: str | None, end_date: str | None) -> dict[str, Any]:
             SUM(total_reviews) AS total_reviews,
             SUM(avg_rating * total_reviews) / NULLIF(SUM(total_reviews), 0) AS avg_rating,
             SUM(pct_negative * total_reviews) / NULLIF(SUM(total_reviews), 0) AS pct_negative,
-            SUM(critical_count) AS critical_count,
-            SUM(churn_high_users) AS churn_high_users
+            SUM(critical_count) AS critical_count
         FROM daily_aggregates
         WHERE day >= ? AND day <= ?
     """
 
+    # Count DISTINCT high-churn users active in the window (summing the daily
+    # counts would double-count users who reviewed on multiple days).
+    churn_query = """
+        SELECT COUNT(DISTINCT r.user_name)
+        FROM reviews_raw r
+        JOIN reviews_enriched e USING (review_id)
+        WHERE e.churn_user_tier = 'high'
+          AND DATE(r.at_ts) >= ? AND DATE(r.at_ts) <= ?
+    """
+
     with duckdb.connect(str(DUCKDB_PATH), read_only=True) as conn:
-        total_reviews, avg_rating, pct_negative, critical_count, churn_high_users = conn.execute(
+        total_reviews, avg_rating, pct_negative, critical_count = conn.execute(
             query, [start_date, end_date]
         ).fetchone()
+        (churn_high_users,) = conn.execute(churn_query, [start_date, end_date]).fetchone()
 
     return {
         "total_reviews": int(total_reviews or 0),
@@ -142,13 +152,17 @@ def _format_quotes(quotes: list[dict[str, Any]]) -> str:
 
 
 def _default_range(min_day: str | None, max_day: str | None) -> tuple[str, str]:
+    # Default to the full data range. The sample spans years with a sparse tail,
+    # so a 7-day default would open on a near-empty dashboard. Presets (7D/30D/
+    # 90D/YTD) let the reviewer narrow from there.
     if not min_day or not max_day:
         today = date.today()
         return ((today - timedelta(days=6)).isoformat(), today.isoformat())
 
-    end = datetime.fromisoformat(max_day).date()
-    start = max(datetime.fromisoformat(min_day).date(), end - timedelta(days=6))
-    return (start.isoformat(), end.isoformat())
+    return (
+        datetime.fromisoformat(min_day).date().isoformat(),
+        datetime.fromisoformat(max_day).date().isoformat(),
+    )
 
 
 def _resolve_preset_range(preset: str, min_day: str | None, max_day: str | None) -> tuple[str, str]:
@@ -430,13 +444,7 @@ def build_app() -> gr.Blocks:
     version_a_default = versions[0] if versions else None
     version_b_default = versions[1] if len(versions) > 1 else version_a_default
 
-    css_path = Path(__file__).resolve().parent / "ui" / "styles.css"
-
-    with gr.Blocks(
-        title="Review Intelligence Dashboard",
-        theme=build_theme(),
-        css=load_css(css_path),
-    ) as demo:
+    with gr.Blocks(title="Review Intelligence Dashboard") as demo:
         current_page = gr.State("overview")
 
         with gr.Row(elem_classes=["ri-dashboard"]):
@@ -604,7 +612,10 @@ def build_app() -> gr.Blocks:
 def main() -> None:
     app = build_app()
     server_port = int(os.getenv("GRADIO_SERVER_PORT", "7861"))
-    app.launch(server_name="127.0.0.1", server_port=server_port)
+    server_name = os.getenv("GRADIO_SERVER_NAME", "127.0.0.1")
+    css_path = Path(__file__).resolve().parent / "ui" / "styles.css"
+    # Gradio 6 moved theme/css from the Blocks constructor to launch().
+    app.launch(server_name=server_name, server_port=server_port, theme=build_theme(), css=load_css(css_path))
 
 
 if __name__ == "__main__":

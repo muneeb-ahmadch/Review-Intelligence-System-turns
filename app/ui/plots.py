@@ -72,6 +72,46 @@ def get_daily_trends(
     return df
 
 
+def get_anomalies() -> pd.DataFrame:
+    """Read flagged anomalies (from pipeline step 08) into a flat table."""
+    import json
+
+    with duckdb.connect(str(DUCKDB_PATH), read_only=True) as conn:
+        rows = conn.execute(
+            """
+            SELECT day, anomaly_flags_json
+            FROM daily_aggregates
+            WHERE anomaly_flags_json IS NOT NULL AND anomaly_flags_json <> '{}'
+            ORDER BY day
+            """
+        ).fetchall()
+
+    records: list[dict] = []
+    for day, payload in rows:
+        try:
+            flags = json.loads(payload or "{}")
+        except json.JSONDecodeError:
+            flags = {}
+        for metric, detail in flags.items():
+            records.append(
+                {
+                    "day": str(day),
+                    "metric": metric,
+                    "value": detail.get("value"),
+                    "baseline": detail.get("baseline"),
+                    "z_score": detail.get("z"),
+                }
+            )
+
+    if not records:
+        return pd.DataFrame(columns=["day", "metric", "value", "baseline", "z_score"])
+
+    df = pd.DataFrame(records)
+    df["abs_z"] = df["z_score"].abs()
+    df = df.sort_values("abs_z", ascending=False).drop(columns="abs_z").reset_index(drop=True)
+    return df
+
+
 def _style_axes(ax, title: str, y_label: str) -> None:
     ax.set_title(title, fontsize=11, fontweight="bold", color=PALETTE["axis"], pad=10)
     ax.set_xlabel("Date", fontsize=9, color=PALETTE["axis"])

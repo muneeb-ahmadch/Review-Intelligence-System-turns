@@ -59,6 +59,16 @@ top_issues AS (
     FROM issue_ranked
     WHERE rn <= 5
     GROUP BY 1
+),
+churn_daily AS (
+    -- Distinct high-churn-risk users who left a review on each day.
+    SELECT
+        DATE(r.at_ts) AS day,
+        COUNT(DISTINCT r.user_name) AS churn_high_users
+    FROM reviews_raw r
+    JOIN user_churn uc ON r.user_name = uc.user_name
+    WHERE uc.churn_tier = 'high'
+    GROUP BY 1
 )
 SELECT
     b.day,
@@ -68,8 +78,9 @@ SELECT
     ROUND(b.pct_positive, 4) AS pct_positive,
     b.critical_count,
     COALESCE(t.top_issues_json, '[]') AS top_issues_json,
-    0 AS churn_high_users,
+    COALESCE(c.churn_high_users, 0) AS churn_high_users,
     '{}' AS anomaly_flags_json
 FROM base b
 LEFT JOIN top_issues t USING (day)
+LEFT JOIN churn_daily c USING (day)
 ORDER BY b.day;

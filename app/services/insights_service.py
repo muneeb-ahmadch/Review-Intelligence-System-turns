@@ -8,8 +8,9 @@ from typing import Any
 from analytics.evidence_quotes import get_evidence_quotes
 from app.config import ROOT_DIR
 from app.services.report_cache import get_or_create_report
+from llm.grounding import ground_report
 from llm.json_enforcer import build_jsonschema_validator, call_json_with_retry, load_json_schema
-from llm.ollama_client import DEFAULT_MODEL
+from llm.provider import active_provider
 from pipeline.db import get_connection
 
 
@@ -43,9 +44,9 @@ def _default_date_range() -> tuple[str, str]:
         start = end - timedelta(days=6)
         return start.isoformat(), end.isoformat()
 
-    end = max_day
-    start = max(min_day, end - timedelta(days=6))
-    return str(start), str(end)
+    # Default to the full data range so an executive brief / backlog generated
+    # with no explicit scope summarises the whole sample, not the sparse tail.
+    return str(min_day), str(max_day)
 
 
 def _normalize_scope(scope: dict[str, Any]) -> dict[str, Any]:
@@ -338,6 +339,70 @@ def _build_weekly_exec_brief_fallback(input_payload: dict[str, Any]) -> dict[str
     }
 
 
+def _priority_for_severity(weighted_severity: float, rank: int) -> str:
+    if rank == 0 or weighted_severity >= 12.0:
+        return "P0"
+    if weighted_severity >= 6.0:
+        return "P1"
+    if weighted_severity >= 2.0:
+        return "P2"
+    return "P3"
+
+
+def _build_sprint_backlog_fallback(input_payload: dict[str, Any]) -> dict[str, Any]:
+    """Deterministic, fully grounded backlog used when no live LLM is available."""
+    top_issues = input_payload.get("top_issues", []) or []
+    evidence = input_payload.get("evidence_reviews", []) or []
+    quotes = [str(item.get("quote", "")) for item in evidence if item.get("quote")]
+
+    tickets = []
+    for rank, issue in enumerate(top_issues[:5]):
+        label = str(issue.get("label", "Unknown Issue"))
+        weighted = float(issue.get("weighted_severity", 0.0) or 0.0)
+        count = int(issue.get("review_count", 0) or 0)
+        tickets.append(
+            {
+                "title": f"Address {label}",
+                "type": "bug",
+                "priority": _priority_for_severity(weighted, rank),
+                "severity_score": round(min(1.0, weighted / max(count, 1)), 3) if count else 0.0,
+                "impact_notes": f"{count} reviews mention {label} (weighted severity {weighted:.1f}).",
+                "acceptance_criteria": [
+                    f"Reproduce the top {label} scenarios from user reviews",
+                    f"Reduce {label} review volume in the next release",
+                ],
+                "evidence_quotes": quotes[:2],
+                "related_labels": [label],
+                "related_versions": [],
+            }
+        )
+
+    if not tickets:
+        tickets.append(
+            {
+                "title": "Investigate top user complaints",
+                "type": "bug",
+                "priority": "P2",
+                "severity_score": 0.0,
+                "impact_notes": "No issue labels detected in this scope.",
+                "acceptance_criteria": ["Triage recent negative reviews"],
+                "evidence_quotes": quotes[:2],
+                "related_labels": [],
+                "related_versions": [],
+            }
+        )
+
+    return {"tickets": tickets}
+
+
+def _build_fallback(report_type: str, input_payload: dict[str, Any]) -> dict[str, Any]:
+    if report_type == "weekly_exec_brief":
+        return _build_weekly_exec_brief_fallback(input_payload)
+    if report_type == "sprint_backlog":
+        return _build_sprint_backlog_fallback(input_payload)
+    raise ValueError(f"No deterministic fallback for report type: {report_type}")
+
+
 def _generate_report(
     report_type: str,
     prompt_file: str,
@@ -356,26 +421,26 @@ def _generate_report(
     input_json = json.dumps(input_payload, indent=2, ensure_ascii=True)
     user_prompt = user_prompt_template.replace("{{input_json}}", input_json)
 
+    provider_name, provider_model = active_provider()
+
     def _generator() -> dict[str, Any]:
         try:
-            return call_json_with_retry(
-                model=DEFAULT_MODEL,
+            raw = call_json_with_retry(
                 system=system_prompt,
                 user=user_prompt,
                 schema_validator=schema_validator,
-                max_retries=1,
+                max_retries=2,
             )
-        except Exception:  # noqa: BLE001
-            if report_type == "weekly_exec_brief":
-                fallback = _build_weekly_exec_brief_fallback(input_payload)
-                schema_validator(fallback)
-                return fallback
-            raise
+            return ground_report(report_type, raw, input_payload)
+        except Exception:  # noqa: BLE001 -- no LLM / bad JSON -> deterministic grounded fallback
+            fallback = _build_fallback(report_type, input_payload)
+            schema_validator(fallback)
+            return ground_report(report_type, fallback, input_payload)
 
     return get_or_create_report(
         report_type=report_type,
         scope=normalized_scope,
-        model=DEFAULT_MODEL,
+        model=provider_model or "deterministic-fallback",
         generator=_generator,
     )
 

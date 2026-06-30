@@ -1,3 +1,11 @@
+> **Status note:** This is the original design document, kept for reference. It
+> describes the full intended scope (incl. ~15 GenAI features, LLM adjudication,
+> a golden set). **It is not a description of what is built.** For the honest
+> "what works today vs. roadmap" split, see [README.md](README.md). What's
+> actually implemented: the deterministic pipeline (steps 00–09), rule-based
+> enrichment, churn + anomaly detection, and two grounded LLM insights (weekly
+> brief, sprint backlog).
+
 ## 1. MVP Goal & Demo Narrative
 
 **MVP name:** *Review Intelligence System – LLM + NLP MVP*
