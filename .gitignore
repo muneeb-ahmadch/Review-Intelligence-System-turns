@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+
+# Local env / secrets
+.env
+
+# Note: data/db/reviews.duckdb IS committed on purpose — it ships the enriched
+# sample data and cached insights so the demo runs from a clean clone with no
+# pipeline step, no Ollama, and no API key.

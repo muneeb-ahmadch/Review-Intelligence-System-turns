@@ -15,3 +15,5 @@ fi
 "$PYTHON_BIN" pipeline/05_user_churn.py
 "$PYTHON_BIN" pipeline/06_aggregates_daily.py
 "$PYTHON_BIN" pipeline/07_aggregates_version.py
+"$PYTHON_BIN" pipeline/08_trends_anomalies.py
+"$PYTHON_BIN" pipeline/09_insight_materialization.py

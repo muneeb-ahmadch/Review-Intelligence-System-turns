@@ -102,24 +102,28 @@ def build_overview_page(default_start: str, default_end: str) -> dict[str, Any]:
 
 
 def build_trends_page() -> dict[str, Any]:
+    from app.ui.plots import get_anomalies
+
+    anomalies = get_anomalies()
+    empty_message = pd.DataFrame(
+        [{"day": "-", "metric": "-", "value": "-", "baseline": "-", "z_score": "no anomalies detected"}]
+    )
+
     with gr.Column(visible=False, elem_classes=["ri-page"], elem_id="page_trends") as page:
-        build_section_header("Trends & Anomalies", "Anomaly monitor placeholder for MVP")
+        build_section_header(
+            "Trends & Anomalies",
+            "Days where pct_negative or critical_count deviate >= 2 std devs from a rolling 7-day baseline",
+        )
         with gr.Group(elem_classes=["ri-card"]):
             gr.Markdown(
-                "Anomaly detection output is currently a placeholder. "
-                "Spike explanations and drill-throughs can plug in here without layout changes."
+                "Detected by pipeline step `08_trends_anomalies` (deterministic z-score, "
+                "min 8 reviews/day). Sorted by magnitude of deviation."
             )
-            anomaly_placeholder = pd.DataFrame(
-                [
-                    {
-                        "day": "-",
-                        "metric": "-",
-                        "z_score": "-",
-                        "status": "No anomaly list wired yet",
-                    }
-                ]
+            anomaly_table = gr.Dataframe(
+                value=anomalies if not anomalies.empty else empty_message,
+                interactive=False,
+                label="Anomaly List",
             )
-            anomaly_table = gr.Dataframe(value=anomaly_placeholder, interactive=False, label="Anomaly List")
 
     return {"page": page, "anomaly_table": anomaly_table}
 

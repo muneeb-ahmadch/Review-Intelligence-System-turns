@@ -9,20 +9,19 @@ from typing import Any, Callable
 from jsonschema import Draft202012Validator
 
 from app.config import ROOT_DIR
-from llm.ollama_client import call_ollama
+from llm.provider import generate
 
 
 Validator = Callable[[dict[str, Any]], None]
 
 
 def call_json_with_retry(
-    model: str,
     system: str,
     user: str,
     schema_validator: Validator,
     max_retries: int = 2,
 ) -> dict[str, Any]:
-    env_retries = os.getenv("OLLAMA_JSON_MAX_RETRIES")
+    env_retries = os.getenv("LLM_JSON_MAX_RETRIES") or os.getenv("OLLAMA_JSON_MAX_RETRIES")
     if env_retries:
         max_retries = max(1, int(env_retries))
 
@@ -30,7 +29,7 @@ def call_json_with_retry(
     prompt_user = user
 
     for attempt in range(max_retries):
-        text = call_ollama(model=model, system=system, user=prompt_user)
+        text = generate(system=system, user=prompt_user)
         try:
             payload = json.loads(text)
             schema_validator(payload)
